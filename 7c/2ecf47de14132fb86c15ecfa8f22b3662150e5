@@ -1,0 +1,19 @@
+docs/orchid/plans/PR-2.md
+  s_a561a4c5de9fb2::t_46be73c2878814 1-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7c2ecf47de14132fb86c15ecfa8f22b3662150e5",
+  "prompts": {},
+  "sessions": {
+    "s_a561a4c5de9fb2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a03492-5959-7991-a1ef-98116d6af98f",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Brandon Guerrero <brandon@orchidautomation.com>"
+    }
+  }
+}
