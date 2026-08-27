@@ -1,0 +1,30 @@
+tests/test_scripts.py
+  s_a12d4b8f6e4274::t_4356d4e798d998 422
+  s_a12d4b8f6e4274::t_b2b926f767dc4e 417-421,423-433,653-681
+  s_a12d4b8f6e4274::t_41a86bf318ccbc 356-372
+scripts/validate_manifest.py
+  s_a12d4b8f6e4274::t_b2b926f767dc4e 244-253
+scripts/validate_trigger_safety.py
+  s_a12d4b8f6e4274::t_b2b926f767dc4e 76-84,109-120
+scripts/analyze_run_traces.py
+  s_a12d4b8f6e4274::t_b2b926f767dc4e 95-97,128,133-141,143,183-186,188-189
+  s_a12d4b8f6e4274::t_4356d4e798d998 129-132,187
+scripts/audit_workflow.py
+  s_a12d4b8f6e4274::t_b2b926f767dc4e 119-126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "7be0625d4c8514a6a5376eb46699e1b888e9961c",
+  "prompts": {},
+  "sessions": {
+    "s_a12d4b8f6e4274": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a043b7-f2b5-7080-8dc8-edf13cc4c2ea",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "Brandon Guerrero <brandon@orchidautomation.com>"
+    }
+  }
+}
