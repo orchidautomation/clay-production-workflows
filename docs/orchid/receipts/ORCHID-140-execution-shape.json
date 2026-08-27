@@ -1,0 +1,129 @@
+{
+  "schema": "orchid.work.execution-shape/v1",
+  "repository": "orchidautomation/clay-production-workflows",
+  "sourceRef": "codex/orchid-140-strengthen-production-audits",
+  "sourceCommit": "a2a74aee92a5e56cca2b576fc0c7673d06ec9098",
+  "plan": {
+    "path": "docs/orchid/plans/PR-6-readiness-gates.md",
+    "sha256": "3cb1d76b5716f1d2b6ca1100223bd3729dc0bfca1e24a6e0a3d0d166829fe778",
+    "sourceRef": "codex/orchid-140-strengthen-production-audits",
+    "sourceCommit": "a2a74aee92a5e56cca2b576fc0c7673d06ec9098"
+  },
+  "risk": "Routine",
+  "orchestrationRequired": true,
+  "selectedShape": "inline-luna",
+  "delivery": {
+    "shape": "single-pr",
+    "sourceRef": "codex/orchid-140-strengthen-production-audits",
+    "targetRef": "main",
+    "pullRequestCount": 1
+  },
+  "solIntegrationOwnership": [
+    "docs/orchid/plans/PR-6-readiness-gates.md",
+    "docs/orchid/receipts/ORCHID-140-execution-shape.json"
+  ],
+  "lunaLanes": [
+    {
+      "issueId": "ORCHID-140",
+      "taskId": "01a043b7-f2b5-7080-8dc8-edf13cc4c2ea",
+      "threadId": "01a043b7-f2b5-7080-8dc8-edf13cc4c2ea",
+      "mode": "initial",
+      "cycle": "initial",
+      "ownership": [
+        "scripts/analyze_run_traces.py",
+        "scripts/audit_workflow.py",
+        "scripts/validate_manifest.py",
+        "scripts/validate_trigger_safety.py",
+        "tests/test_scripts.py",
+        "references/applicability-and-profiles.md",
+        "references/profile-crm-sync.md",
+        "references/profile-enrichment-sync.md",
+        "references/profile-inbound-routing.md",
+        "references/profile-outbound-campaign.md"
+      ],
+      "assignedBranch": "codex/orchid-140-strengthen-production-audits",
+      "observedBranch": "codex/orchid-140-strengthen-production-audits",
+      "worktreeBindingState": "confirmed",
+      "worktree": "/private/tmp/clay-production-workflows-pr6-fix",
+      "plan": {
+        "path": "docs/orchid/plans/PR-6-readiness-gates.md",
+        "sha256": "3cb1d76b5716f1d2b6ca1100223bd3729dc0bfca1e24a6e0a3d0d166829fe778",
+        "sourceRef": "codex/orchid-140-strengthen-production-audits",
+        "sourceCommit": "a2a74aee92a5e56cca2b576fc0c7673d06ec9098"
+      },
+      "execution": {
+        "model": "gpt-5.6-luna",
+        "reasoningEffort": "medium",
+        "role": "execute-pinned-plan-only",
+        "requestedServiceTier": "fast",
+        "serviceTierControl": "explicit",
+        "serviceTierEvidence": "thread/start confirmed serviceTier=priority",
+        "observedServiceTier": "priority",
+        "fastModeState": "confirmed"
+      },
+      "dispatchReceipt": {
+        "schema": "orchid.work.luna-dispatch/v1",
+        "mode": "initial",
+        "role": "execute-pinned-plan-only",
+        "lane": "ORCHID-140",
+        "cycle": "initial",
+        "taskId": "01a043b7-f2b5-7080-8dc8-edf13cc4c2ea",
+        "threadId": "01a043b7-f2b5-7080-8dc8-edf13cc4c2ea",
+        "cwd": "/private/tmp/clay-production-workflows-pr6-fix",
+        "branch": "codex/orchid-140-strengthen-production-audits",
+        "worktree": "/private/tmp/clay-production-workflows-pr6-fix",
+        "plan": {
+          "path": "docs/orchid/plans/PR-6-readiness-gates.md",
+          "sha256": "3cb1d76b5716f1d2b6ca1100223bd3729dc0bfca1e24a6e0a3d0d166829fe778",
+          "sourceRef": "codex/orchid-140-strengthen-production-audits",
+          "sourceCommit": "a2a74aee92a5e56cca2b576fc0c7673d06ec9098"
+        },
+        "request": {
+          "cwd": "/private/tmp/clay-production-workflows-pr6-fix",
+          "model": "gpt-5.6-luna",
+          "reasoningEffort": "medium",
+          "serviceTier": "priority",
+          "title": "ORCHID-140-implementation-fail-closed-readiness-gates",
+          "method": "thread/start"
+        },
+        "requestedTitle": "ORCHID-140-implementation-fail-closed-readiness-gates",
+        "observed": {
+          "model": "gpt-5.6-luna",
+          "reasoningEffort": "medium",
+          "serviceTier": "priority",
+          "title": "ORCHID-140-implementation-fail-closed-readiness-gates",
+          "turnId": null
+        },
+        "titleEvidence": {
+          "state": "confirmed",
+          "requested": "ORCHID-140-implementation-fail-closed-readiness-gates",
+          "observed": "ORCHID-140-implementation-fail-closed-readiness-gates"
+        },
+        "modelEvidence": {
+          "source": "model/list",
+          "model": "gpt-5.6-luna",
+          "reasoningEffort": "medium",
+          "priorityObserved": true
+        },
+        "execution": {
+          "model": "gpt-5.6-luna",
+          "reasoningEffort": "medium",
+          "role": "execute-pinned-plan-only",
+          "requestedServiceTier": "fast",
+          "serviceTierControl": "explicit",
+          "serviceTierEvidence": "thread/start confirmed serviceTier=priority",
+          "observedServiceTier": "priority",
+          "fastModeState": "confirmed"
+        },
+        "observedAt": "2026-08-27T14:55:25.302Z",
+        "contentHash": "276aa2a76b1d0b8003079202068774a7df2413dc9147602e4b29c5e980e896c0"
+      }
+    }
+  ],
+  "exceptionReason": null,
+  "exceptionPaths": [],
+  "exceptionJustification": null,
+  "validation": [],
+  "verdict": "valid",
+  "observedAt": "2026-08-27T14:55:25.302Z"
+}

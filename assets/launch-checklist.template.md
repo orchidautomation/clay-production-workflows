@@ -1,36 +1,54 @@
 # Clay Workflow Launch Checklist
 
+Mark each conditional item `PASS`, `BLOCKED`, `UNKNOWN`, or `NOT_APPLICABLE`.
+
+## Applicability
+
+- [ ] Primary profile, composed profiles, and unit of work are declared.
+- [ ] Declared capabilities were compared with executable nodes, actions, and triggers.
+- [ ] Detected capabilities add safeguards even when the manifest omitted them.
+- [ ] Irrelevant profile checks are explicitly `NOT_APPLICABLE`.
+
 ## Configuration
 
 - [ ] No placeholders or `REPLACE_ME` values remain.
-- [ ] Manifest hash matches the approval manifest.
+- [ ] Workflow contract hash matches the approved configuration.
 - [ ] Approval is scoped, unexpired, and names an owner.
-- [ ] Source and destination IDs were verified read-only.
-- [ ] Trigger entity types and segment counts are correct.
+- [ ] Source identifiers and any destination IDs were verified read-only.
+- [ ] When Audience-triggered, entity types and segment counts are correct.
+- [ ] When Audience-triggered, one intended trigger generation is active and cohorts do not overlap unexpectedly.
+- [ ] Every custom Clay function fingerprint matches the approved manifest.
 
 ## Contract
 
-- [ ] Generator, repair, validator, QA, payload, and receipt agree on sequence length.
-- [ ] All required destination fields are present on every eligible branch.
+- [ ] Every producer and consumer agrees on each declared cross-node field contract.
+- [ ] When outbound, generator, repair, validator, QA, payload, and receipt agree on sequence length.
+- [ ] When mutating, all required destination fields are present on every eligible branch.
 - [ ] Tool input mappings and result paths were read back after save.
-- [ ] Required fields are checked at the final payload boundary.
+- [ ] Conditional calls, transition registries, targets, and edge handles agree.
+- [ ] Context required after a tool node is supplied through explicit input references.
+- [ ] Required values are checked at the final decision or payload boundary.
 
 ## Safety
 
 - [ ] Worst-case credits and BYOA cost are approved.
-- [ ] Existing-record, reply, bounce, unsubscribe, and blocklist behavior is defined.
-- [ ] A just-in-time suppression check runs before sequencer enrollment.
-- [ ] Mutations use separate approval gates and fill-only writes where appropriate.
+- [ ] Routing workflows define precedence, fallback owner/queue, duplicate behavior, and reason codes.
+- [ ] Enrichment workflows define cache, freshness, source precedence, usable-value checks, and bounded fallbacks.
+- [ ] Outbound workflows define existing membership, reply, bounce, unsubscribe, and blocklist behavior.
+- [ ] Outbound workflows repeat time-sensitive suppression immediately before enrollment.
+- [ ] Mutations use separate approval gates and an explicit field-stewardship policy.
 - [ ] Ambiguous write failures require readback before retry.
 
 ## Evidence
 
 - [ ] Manual draft test passed.
 - [ ] No-write preview passed.
-- [ ] Real canary reached every intended destination.
-- [ ] Audience, CRM, campaign membership, and sequencer readbacks passed.
-- [ ] Duplicate rerun did not duplicate or re-enroll the record.
+- [ ] Real canary proved the declared terminal outcome and applicable postconditions.
+- [ ] Every intended mutation was independently read back or has documented strongest-available evidence.
+- [ ] Duplicate rerun did not duplicate a write, assignment, membership, or work item.
 - [ ] Terminal outcome distribution is reported without treating `completed` as success.
+- [ ] No later node downgrades a verified side effect or postcondition to false.
+- [ ] No run contains incompatible terminal outcome classes.
 
 ## Release
 

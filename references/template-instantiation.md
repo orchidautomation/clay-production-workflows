@@ -1,22 +1,24 @@
 # Template Instantiation
 
 1. Duplicate the template and preserve source workflow/snapshot identifiers.
-2. Keep triggers on empty control segments while configuring.
-3. Replace placeholders, destinations, owner, counts, and budgets.
-4. Set state to `DRAFT` and all approvals false.
-5. Normalize and hash the manifest.
-6. Rebind account and person-queue sources; verify entity and count.
-7. Resolve destinations through read-only lookups.
-8. Run the semantic contract audit across every sequence consumer.
-9. Update outdated agents and re-read persisted prompts/schemas.
-10. Run a no-write preview before mutation approval.
-11. Bind approval to final manifest hash, approver, timestamp, and expiry.
-12. Follow the bounded ladder.
+2. Classify the target purpose and capabilities; load only applicable profiles.
+3. Keep triggers disabled or on empty control inputs while configuring.
+4. Replace placeholders, sources, destinations, owner, counts, and budgets.
+5. Set state to `DRAFT` and all approvals false.
+6. Normalize and hash the manifest.
+7. Rebind input sources; verify source contract, entity, and count.
+8. Resolve destinations through read-only lookups when mutations are present.
+9. Run the semantic audit across every producer and consumer of each declared field.
+10. Update outdated agents and re-read persisted prompts/schemas when agents are present.
+11. Run a no-write preview before paid-work or mutation approval.
+12. Bind approval to final manifest hash, approver, timestamp, scope, and expiry.
+13. Follow the bounded ladder.
 
 Before approval, name all five production owners, record the trigger pause method and
 known-good rollback snapshot, and set the log allowlist, redactions, and retention.
 Use the hash emitted by `scripts/validate_manifest.py`; approval fields are excluded
 from normalization so the approval evidence does not hash itself.
 
-Changing sequence length requires updating generator, repair, validator, QA, payload,
-destination variables, and receipts. A structurally valid, untested template is unproven.
+Changing any cross-node contract requires updating every producer and consumer. For
+outbound, that includes generator, repair, validator, QA, payload, destination
+variables, and receipts. A structurally valid, untested template is unproven.

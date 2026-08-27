@@ -11,11 +11,15 @@ from pathlib import Path
 from typing import Any
 
 from summarize_runs import summarize
+from analyze_run_traces import analyze_run_traces
+from classify_workflow import classify_workflow
 from validate_contract import analyze
 from check_evidence_compat import analyze_evidence
 from validate_graph_controls import analyze_graph_controls
 from validate_manifest import analyze_manifest
 from validate_reconciliation import analyze_reconciliation
+from validate_snapshot_semantics import analyze_snapshot
+from validate_trigger_safety import analyze_trigger_safety
 
 
 def load_json(path: Path, required: bool = True) -> Any:
@@ -36,6 +40,38 @@ def matching_names(nodes: list[dict[str, Any]], terms: tuple[str, ...]) -> list[
     ]
 
 
+def coverage_status(result: dict[str, Any], *, supplied: bool = True) -> str:
+    if result.get("applicable") is False:
+        return "NOT_APPLICABLE"
+    if not supplied:
+        return "NOT_CHECKED"
+    if result.get("valid") is not True:
+        return "FAILED"
+    codes = {str(item.get("code")) for item in result.get("findings") or []}
+    if any("unknown" in code or "not_supplied" in code for code in codes):
+        return "UNKNOWN"
+    return "PROVEN"
+
+
+def not_applicable(check: str, reason: str, **extra: Any) -> dict[str, Any]:
+    return {
+        "valid": True,
+        "applicable": False,
+        "findings": [{
+            "severity": "INFO",
+            "code": "check_not_applicable",
+            "check": check,
+            "reason": reason,
+        }],
+        "summary": {"blockers": 0, "high": 0, "warnings": 0},
+        **extra,
+    }
+
+
+def proven_or_not_applicable(result: dict[str, Any], *, supplied: bool = True) -> bool:
+    return coverage_status(result, supplied=supplied) in {"PROVEN", "NOT_APPLICABLE"}
+
+
 def audit(evidence_dir: Path) -> dict[str, Any]:
     graph = load_json(evidence_dir / "graph.json")
     validation = load_json(evidence_dir / "validation.json")
@@ -43,13 +79,21 @@ def audit(evidence_dir: Path) -> dict[str, Any]:
     failed = load_json(evidence_dir / "failed-runs.json", required=False)
     workflow = load_json(evidence_dir / "workflow.json", required=False)
     triggers = load_json(evidence_dir / "triggers.json", required=False)
+    current_snapshot = load_json(evidence_dir / "current-snapshot.json", required=False)
+    audience_segments = load_json(evidence_dir / "audience-segments.json", required=False)
+    function_fingerprints = load_json(evidence_dir / "function-fingerprints.json", required=False)
+    run_traces = load_json(evidence_dir / "run-traces.json", required=False)
     manifest = load_json(evidence_dir / "manifest.json", required=False)
     receipts = load_json(evidence_dir / "receipts.json", required=False)
 
     nodes = list(graph.get("nodes") or [])
     summary = graph.get("summary") or {}
     type_counts = Counter(str(node.get("nodeType") or "unknown") for node in nodes)
-    contract = analyze(graph, validation)
+    applicability = classify_workflow(graph, manifest or None, triggers or None)
+    capabilities = set(applicability["capabilities"]["effective"])
+    contract = analyze(graph, validation) if "copy_sequence" in capabilities else not_applicable(
+        "sequence_contract", "the workflow does not generate or transport an ordered copy sequence"
+    )
     compatibility = analyze_evidence(evidence_dir)
     manifest_audit = analyze_manifest(manifest) if manifest else {
         "valid": False,
@@ -57,25 +101,72 @@ def audit(evidence_dir: Path) -> dict[str, Any]:
         "findings": [{"severity": "HIGH", "code": "manifest_evidence_missing"}],
         "summary": {"blockers": 0, "high": 1, "warnings": 0},
     }
-    graph_controls = analyze_graph_controls(graph, manifest or None)
-    reconciliation = analyze_reconciliation(
-        receipts, manifest_audit.get("configuration_hash")
-    ) if receipts else {
-        "valid": False,
-        "live_ready_proven": False,
-        "receipt_count": 0,
-        "outcome_counts": {},
-        "findings": [{"severity": "MEDIUM", "code": "reconciliation_receipts_not_supplied"}],
+    graph_controls = analyze_graph_controls(
+        graph, manifest or None, function_fingerprints or None
+    )
+    snapshot_semantics = analyze_snapshot(current_snapshot) if current_snapshot else {
+        "valid": True,
+        "findings": [{"severity": "MEDIUM", "code": "current_snapshot_not_supplied"}],
         "summary": {"blockers": 0, "high": 0, "warnings": 1},
     }
-    run_summary = summarize(runs, failed)
+    trigger_safety = (
+        analyze_trigger_safety(triggers, audience_segments or None)
+        if "audience_triggered" in capabilities
+        else not_applicable(
+            "trigger_overlap", "the workflow is not driven by a Clay Audience segment"
+        )
+    )
+    contract_outcomes = {
+        str(item)
+        for item in ((manifest.get("workflow_contract") or {}).get("terminal_outcomes") or [])
+        if item
+    }
+    run_trace_audit = analyze_run_traces(
+        run_traces, contract_outcomes if manifest else None
+    ) if run_traces else {
+        "valid": True,
+        "run_count": 0,
+        "traced_node_count": 0,
+        "findings": [{"severity": "MEDIUM", "code": "run_traces_not_supplied"}],
+        "summary": {"blockers": 0, "high": 0, "warnings": 1},
+    }
+    if "external_mutation" not in capabilities:
+        reconciliation = not_applicable(
+            "destination_reconciliation",
+            "the workflow has no detected or declared external mutation",
+            live_ready_proven=True,
+            receipt_count=0,
+            outcome_counts={},
+        )
+    elif receipts:
+        success_outcome = (manifest.get("reconciliation") or {}).get("success_outcome")
+        reconciliation = analyze_reconciliation(
+            receipts,
+            manifest_audit.get("configuration_hash"),
+            contract_outcomes,
+            {str(success_outcome)} if success_outcome else None,
+        )
+    else:
+        reconciliation = {
+            "valid": False,
+            "live_ready_proven": False,
+            "receipt_count": 0,
+            "outcome_counts": {},
+            "findings": [{"severity": "MEDIUM", "code": "reconciliation_receipts_not_supplied"}],
+            "summary": {"blockers": 0, "high": 0, "warnings": 1},
+        }
+    run_summary = summarize(runs, failed, graph)
 
     structural_ok = validation.get("valid") is True and not (validation.get("errors") or [])
     contract_ok = contract.get("valid") is True
     governance_ok = (
         compatibility.get("compatible") is True
+        and applicability.get("valid") is True
         and manifest_audit.get("valid") is True
         and graph_controls.get("valid") is True
+        and snapshot_semantics.get("valid") is True
+        and trigger_safety.get("valid") is True
+        and run_trace_audit.get("valid") is True
     )
     if not structural_ok or not contract_ok or not governance_ok:
         ceiling = "DRAFT_BLOCKED"
@@ -83,8 +174,13 @@ def audit(evidence_dir: Path) -> dict[str, Any]:
         ceiling = "PREVIEW_READY"
     elif (
         reconciliation.get("live_ready_proven") is True
-        and (manifest.get("campaign") or {}).get("state") == "LIVE_READY"
-        and (manifest.get("campaign") or {}).get("ready") is True
+        and run_trace_audit.get("run_count", 0) > 0
+        and run_trace_audit.get("traced_node_count", 0) > 0
+        and proven_or_not_applicable(snapshot_semantics, supplied=bool(current_snapshot))
+        and proven_or_not_applicable(trigger_safety, supplied=bool(triggers))
+        and proven_or_not_applicable(run_trace_audit, supplied=bool(run_traces))
+        and ((manifest.get("workflow_contract") or manifest.get("campaign") or {}).get("state") == "LIVE_READY")
+        and ((manifest.get("workflow_contract") or manifest.get("campaign") or {}).get("ready") is True)
     ):
         ceiling = "LIVE_READY"
     else:
@@ -102,9 +198,9 @@ def audit(evidence_dir: Path) -> dict[str, Any]:
         "readiness_ceiling": ceiling,
         "live_ready_proven": ceiling == "LIVE_READY",
         "live_ready_reason": (
-            "Validated reconciliation receipts contain an activated canary with verified readbacks."
+            "A bounded canary proved the workflow's declared terminal outcome and every applicable postcondition."
             if ceiling == "LIVE_READY"
-            else "Static evidence and run status cannot replace verified destination readbacks."
+            else "Static evidence and run status cannot replace the applicable runtime postconditions."
         ),
         "structure": {
             "node_count": summary.get("nodeCount") or len(nodes),
@@ -126,15 +222,42 @@ def audit(evidence_dir: Path) -> dict[str, Any]:
             "warning_codes": sorted({str(item.get("code")) for item in warnings if item.get("code")}),
         },
         "semantic_contract": contract,
+        "applicability": applicability,
         "manifest_contract": manifest_audit,
         "graph_controls": graph_controls,
+        "snapshot_semantics": snapshot_semantics,
+        "trigger_safety": trigger_safety,
         "evidence_compatibility": compatibility,
         "run_evidence": run_summary,
+        "run_trace_consistency": run_trace_audit,
         "reconciliation_evidence": reconciliation,
+        "coverage": {
+            "structural_validation": "PROVEN" if structural_ok else "FAILED",
+            "semantic_contract": coverage_status(contract),
+            "manifest_contract": coverage_status(manifest_audit, supplied=bool(manifest)),
+            "graph_controls": coverage_status(graph_controls),
+            "raw_snapshot_semantics": coverage_status(snapshot_semantics, supplied=bool(current_snapshot)),
+            "trigger_safety": coverage_status(trigger_safety, supplied=bool(triggers)),
+            "run_outcome_consistency": coverage_status(run_trace_audit, supplied=bool(run_traces)),
+            "destination_reconciliation": coverage_status(reconciliation, supplied=bool(receipts)),
+        },
         "required_next_evidence": [
-            "Exact terminal business outcomes for completed runs",
-            "Readbacks from every intended external destination",
-            "Duplicate-rerun behavior",
+            item for condition, item in (
+                (not current_snapshot, "Current raw snapshot for transition and context validation"),
+                (
+                    "audience_triggered" in capabilities and not audience_segments,
+                    "Redacted Audience segment fingerprints for trigger overlap",
+                ),
+                (not run_traces, "Redacted node outcome trace for at least one bounded canary"),
+                (
+                    "external_mutation" in capabilities and not receipts,
+                    "Readbacks from every intended external destination",
+                ),
+                (
+                    "external_mutation" in capabilities or "routing" in capabilities,
+                    "Duplicate-rerun behavior for the stable identity and idempotency key",
+                ),
+            ) if condition
         ],
     }
 

@@ -1,9 +1,11 @@
 ---
 name: clay-production-workflows
-description: Build, migrate, explain, visualize, audit, test, and launch-gate multi-node Clay Workflows that enrich accounts or people and may write to Audiences, a CRM, or a sequencer. Use for plain-English walkthroughs and in-conversation visualizations of governed workflow diagrams, production hardening, parity migrations, reusable campaign templates, bounded canaries, semantic contract checks, cost and approval gates, payload completeness, idempotency, and downstream reconciliation. Do not use for simple table explanations, one-off enrichment questions, generic non-Clay diagrams, or read-only audience counts.
+description: Build, migrate, explain, visualize, audit, test, and launch-gate multi-node Clay Workflows for enrichment, routing, synchronization, research, and outbound automation. Use for governed workflow architecture, production hardening, parity migrations, reusable templates, bounded canaries, semantic contracts, cost and approval gates, idempotency, external-write verification, and downstream reconciliation. Do not use for simple table explanations, one-off enrichment questions, generic non-Clay diagrams, or read-only audience counts.
+license: MIT
+compatibility: Python 3.11+ for offline checks; authenticated Clay CLI and network access for live evidence collection.
 metadata:
   author: orchid-automation
-  version: "0.6.0"
+  version: "0.8.0"
 ---
 
 # Clay Production Workflows
@@ -11,6 +13,26 @@ metadata:
 Treat a Clay Workflow as a governed production system, not merely a valid graph.
 The target outcome is a workflow whose configuration, contracts, test evidence,
 external writes, and readbacks agree.
+
+## Applicability before procedure
+
+First classify the workflow's business purpose and capabilities. Read
+[applicability-and-profiles.md](references/applicability-and-profiles.md) for every
+build, migration, audit, or launch-gate task. Apply the universal production kernel
+to every in-scope workflow, then load only the profile references whose capabilities
+are present:
+
+- Routing or assignment: [profile-inbound-routing.md](references/profile-inbound-routing.md)
+- Paid enrichment, normalization, or research: [profile-enrichment-sync.md](references/profile-enrichment-sync.md)
+- CRM creation, update, ownership, or membership: [profile-crm-sync.md](references/profile-crm-sync.md)
+- Copy sequences or sequencer activation: [profile-outbound-campaign.md](references/profile-outbound-campaign.md)
+- Audience triggers or Audience writes: [profile-audience-triggered.md](references/profile-audience-triggered.md)
+
+Profiles compose. Do not require copy, suppression, CRM, sequencer, or Audience
+controls when the corresponding capability is absent. Report an irrelevant check as
+`NOT_APPLICABLE`; report an applicable check without evidence as `UNKNOWN` or
+`NOT_CHECKED`. A workflow-specific convention becomes universal only when it protects
+a general safety invariant.
 
 ## Requirements
 
@@ -57,8 +79,9 @@ fixtures and semantic checks; do not invent live CLI shapes or claim workspace p
 2. **Build or migrate for parity** — define the canonical contract, stage the
    architecture, add fail-closed controls, and prove parity with bounded evidence.
    Read [architecture.md](references/architecture.md).
-3. **Instantiate a reusable template** — replace the campaign manifest, rebind safe
-   sources and destinations, invalidate stale approvals, and test all contract
+3. **Instantiate a reusable template** — replace the workflow contract and applicable
+   profile extensions, rebind safe sources and destinations, invalidate stale
+   approvals, and test all contract
    consumers. Read [template-instantiation.md](references/template-instantiation.md).
 4. **Test or launch-gate** — use the bounded ladder, distinguish draft from live,
    reconcile every write, and report a readiness verdict. Read
@@ -79,27 +102,42 @@ human-readable name. Then prefer the bundled collector over repeated ad hoc comm
 
 ```bash
 python3 scripts/collect_workflow_evidence.py WORKFLOW_ID --output EVIDENCE_DIR \
-  --manifest campaign-manifest.json --receipts reconciliation-receipts.json
+  --manifest workflow-contract.json --receipts reconciliation-receipts.json \
+  --trace-run BOUNDED_CANARY_RUN_ID
 ```
 
-The collector only reads workflow metadata, graph, validation, diagram, snapshots,
-triggers, and recent run metadata. It does not test, publish, resume, or mutate.
+The collector only reads workflow metadata, graph, validation, the current raw
+snapshot, triggers, redacted Audience cohort fingerprints, custom-function
+fingerprints, and recent run metadata. `--trace-run` adds an allowlisted outcome
+trace without emails, message bodies, or raw provider payloads. It does not test,
+publish, resume, or mutate.
 
 Audit the evidence:
 
 ```bash
+python3 scripts/classify_workflow.py EVIDENCE_DIR/graph.json \
+  --manifest EVIDENCE_DIR/manifest.json --triggers EVIDENCE_DIR/triggers.json
 python3 scripts/validate_contract.py EVIDENCE_DIR/graph.json \
   --validation EVIDENCE_DIR/validation.json
 python3 scripts/validate_manifest.py EVIDENCE_DIR/manifest.json
 python3 scripts/validate_graph_controls.py EVIDENCE_DIR/graph.json \
-  --manifest EVIDENCE_DIR/manifest.json
+  --manifest EVIDENCE_DIR/manifest.json \
+  --function-fingerprints EVIDENCE_DIR/function-fingerprints.json
+python3 scripts/validate_snapshot_semantics.py EVIDENCE_DIR/current-snapshot.json
+python3 scripts/validate_trigger_safety.py EVIDENCE_DIR/triggers.json \
+  --audience-segments EVIDENCE_DIR/audience-segments.json
+python3 scripts/analyze_run_traces.py EVIDENCE_DIR/run-traces.json
 python3 scripts/check_evidence_compat.py EVIDENCE_DIR
 python3 scripts/validate_reconciliation.py EVIDENCE_DIR/receipts.json \
   --manifest EVIDENCE_DIR/manifest.json
 python3 scripts/summarize_runs.py EVIDENCE_DIR/runs.json \
-  --failed-runs EVIDENCE_DIR/failed-runs.json
+  --failed-runs EVIDENCE_DIR/failed-runs.json --graph EVIDENCE_DIR/graph.json
 python3 scripts/audit_workflow.py EVIDENCE_DIR
 ```
+
+The classifier and aggregate audit determine applicability. Run sequence, trigger,
+or reconciliation validators individually only when their reported capability is
+present; the aggregate audit records irrelevant checks as `NOT_APPLICABLE`.
 
 Explain the workflow for a non-technical reader:
 
@@ -118,14 +156,17 @@ replacing these scripts. Structured data goes to stdout; diagnostics go to stder
 
 ## Canonical contract before graph work
 
-Define one campaign manifest covering campaign identity, sources, eligibility,
-required fields, exact sequence length, destinations, suppression, worst-case cost,
-approval scope, payload fields by destination, terminal outcomes, accountable owners,
-kill-switch and rollback details, data handling, and reconciliation ownership.
+Define one workflow contract covering profile, capabilities, lifecycle state, unit of
+work, sources, required fields, stable identity, terminal outcomes, worst-case cost,
+approval scope, accountable owners, kill switch, rollback, data handling, and mutable
+dependencies. Add destination payloads and verification for every external mutation.
+Add campaign identity, exact sequence length, suppression, and activation only for
+outbound workflows.
 
-Start from [campaign-manifest.template.json](assets/campaign-manifest.template.json).
-Defaults must permit no paid work and no external writes. Changing the normalized
-manifest must invalidate prior approval.
+Start from [workflow-contract.template.json](assets/workflow-contract.template.json).
+Extend it with [campaign-manifest.template.json](assets/campaign-manifest.template.json)
+only for outbound campaigns. Defaults must permit no paid work, publish, or external
+writes. Changing the normalized manifest must invalidate prior approval.
 
 The normalized configuration excludes the `approvals` object so approval evidence
 does not create a circular hash. Use the hash reported by
@@ -134,14 +175,21 @@ claim requires named business, build, approval, reconciliation, and incident own
 
 ## Production architecture
 
-Prefer explicit stages: safe entry adapters; fail-closed preflight; deterministic
-eligibility; cache-aware enrichment; durable per-person queueing; identity and
-suppression; generation; deterministic validation; one repair and independent QA;
-payload preview; separately approved writes; and read-after-write reconciliation.
+Assemble only the stages the effective capabilities require: safe entry adapter;
+fail-closed preflight; deterministic routing or eligibility; cache-aware enrichment;
+durable work items where independent retry is required; deterministic validation;
+payload preview; separately approved mutations; and postcondition verification.
+Copy generation, repair, QA, suppression, and sequencer activation belong only to the
+outbound profile.
 
 Use deterministic code for routing, normalization, validation, hashing, budgets,
 and identifiers. Use agents only for judgment or generation. Preserve exact values
 with typed schemas or explicit tool input mappings.
+
+Treat a write response as an attempt receipt, not proof of the postcondition. Prefer
+a separate destination read. When the provider has no read surface, require the
+strongest independent evidence available—such as a correlated webhook, transactional
+receipt, or downstream query—and state the residual uncertainty.
 
 ## Mandatory semantic audit
 
@@ -149,20 +197,23 @@ Clay graph validation is necessary but not sufficient. Compare the canonical
 contract across node names, prompts, input/output schemas, validators, repair
 agents, QA agents, payload builders, destination mappings, and receipts.
 
-For a sequence of length `N`, every consumer must produce, validate, map, and
-reconcile exactly `N` subjects and bodies. A structural pass cannot override a
-semantic mismatch. Treat an untested template as unproven even when it validates.
+For an outbound sequence of length `N`, every consumer must produce, validate, map,
+and reconcile exactly `N` subjects and bodies. For other profiles, identify the
+equivalent cross-node contract: routing owner and reason, enriched fields and
+evidence, CRM object and stewardship, or declared payload and postcondition. A
+structural pass cannot override a semantic mismatch. Treat an untested template as
+unproven even when it validates.
 
-## Identity, idempotency, and suppression
+## Identity, idempotency, and conditional suppression
 
 - Validate actual required values, not just successful node statuses.
-- Prefer normalized LinkedIn URL for a person and normalized domain for an account,
-  with CRM IDs when already known.
-- Derive per-person idempotency from campaign identity plus stable person identity.
-- Use fill-only updates unless overwriting was explicitly approved.
-- Check campaign membership, replies, bounces, unsubscribes, unsafe statuses, and
-  blocklist evidence when available.
-- Repeat suppression immediately before sequencer enrollment to reduce race windows.
+- Choose stable identity appropriate to the unit of work. For people and companies,
+  normalized LinkedIn URL, domain, and durable CRM IDs are common options.
+- Derive idempotency from workflow purpose plus stable unit identity.
+- Declare field stewardship; fill-only is a safe default for enrichment sync, not a
+  universal overwrite policy.
+- Apply campaign membership, reply, bounce, unsubscribe, blocklist, and just-in-time
+  suppression checks only when outbound activation is present.
 
 ## Testing and readiness
 
@@ -170,13 +221,17 @@ Progress through one manual draft record, one no-write preview, one approved can
 two-to-five branch-covering records, then a bounded cohort with a stop condition.
 Scale only after destination readbacks are verified.
 
-Do not equate Clay `completed` with business success. Classify terminal outcomes as
-activated and verified, already satisfied, review-only, safely suppressed, provider
-failure, destination rejection, or reconciliation failure.
+Do not equate Clay `completed` with business success. Declare terminal outcomes for
+the profile and include verified success, already satisfied or safely skipped,
+review/fallback, provider failure, destination rejection when applicable, and
+reconciliation failure when mutation is possible.
 
 Use only `DRAFT_BLOCKED`, `PREVIEW_READY`, `CANARY_READY`, or `LIVE_READY`.
-`LIVE_READY` requires a real canary that reached every intended destination and was
-independently read back. Static inspection can set a ceiling but cannot prove it.
+`LIVE_READY` requires a real canary that proved the declared terminal outcome and all
+applicable postconditions. External mutations require independent destination
+readback; all workflows require an outcome trace with no side-effect downgrade or
+contradictory terminal classification. Static inspection can set a ceiling but cannot
+prove it.
 
 Before live operation, record the exact trigger pause method, rollback snapshot,
 downstream remediation owner, permitted log fields, redactions, and retention. A

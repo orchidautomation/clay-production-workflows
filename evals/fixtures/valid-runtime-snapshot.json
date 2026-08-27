@@ -1,0 +1,50 @@
+{
+  "id": "wfs_fixture_valid",
+  "hash": "fixture-valid-hash",
+  "nodes": [
+    {
+      "id": "trigger",
+      "name": "Segment Trigger",
+      "nodeType": "trigger",
+      "isInitial": false,
+      "isTerminal": false,
+      "nodeConfig": {"nodeType": "trigger"}
+    },
+    {
+      "id": "router",
+      "name": "Route Account",
+      "nodeType": "conditional",
+      "isInitial": true,
+      "isTerminal": false,
+      "currentScriptVersion": {
+        "code": "def handler(context):\n    context.transition_to('Final Receipt', 'pass')\n    return context"
+      },
+      "nodeConfig": {
+        "nodeType": "conditional",
+        "conditionalConfig": {
+          "mode": "code",
+          "codeTransitions": [
+            {"id": "pass", "name": "pass", "targetNodeId": "terminal"}
+          ]
+        }
+      }
+    },
+    {
+      "id": "terminal",
+      "name": "Final Receipt",
+      "nodeType": "code",
+      "isInitial": false,
+      "isTerminal": true,
+      "currentScriptVersion": {"code": "def handler(context):\n    return context"},
+      "nodeConfig": {"nodeType": "code"}
+    }
+  ],
+  "edges": [
+    {"sourceNodeId": "trigger", "targetNodeId": "router", "metadata": null},
+    {
+      "sourceNodeId": "router",
+      "targetNodeId": "terminal",
+      "metadata": {"conditionalSourceHandle": "conditional-code-pass"}
+    }
+  ]
+}

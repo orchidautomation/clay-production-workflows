@@ -1,0 +1,26 @@
+{
+  "triggers": {
+    "data": [
+      {"id": "trigger_unified", "segmentId": "segment_unified", "entityType": "ACCOUNT"},
+      {"id": "trigger_legacy", "segmentId": "segment_legacy", "entityType": "ACCOUNT"}
+    ]
+  },
+  "audience_segments": {
+    "data": [
+      {
+        "segment_id": "segment_unified",
+        "name": "Unified 50",
+        "entity_type": "companies",
+        "filter_sha256": "sha256:unified",
+        "identity_value_hashes": ["company-a", "company-b"]
+      },
+      {
+        "segment_id": "segment_legacy",
+        "name": "Legacy 25",
+        "entity_type": "companies",
+        "filter_sha256": "sha256:legacy",
+        "identity_value_hashes": ["company-b"]
+      }
+    ]
+  }
+}

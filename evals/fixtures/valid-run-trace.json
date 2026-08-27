@@ -1,0 +1,28 @@
+{
+  "data": [
+    {
+      "runId": "wfr_fixture_valid",
+      "nodes": [
+        {
+          "nodeId": "verify",
+          "name": "Exact Destination Readback",
+          "fields": {
+            "activation_executed": true,
+            "instantly_write_executed": true,
+            "instantly_campaign_membership_verified": true,
+            "workflow_outcome": "ACTIVATED_VERIFIED"
+          }
+        },
+        {
+          "nodeId": "terminal",
+          "name": "Final Receipt",
+          "fields": {
+            "activation_executed": true,
+            "instantly_write_executed": true,
+            "terminal_outcome": "activated_verified"
+          }
+        }
+      ]
+    }
+  ]
+}

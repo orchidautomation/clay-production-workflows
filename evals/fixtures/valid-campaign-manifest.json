@@ -1,4 +1,35 @@
 {
+  "workflow_contract": {
+    "profile": "outbound_campaign",
+    "capabilities": [
+      "audience_triggered",
+      "paid_enrichment",
+      "external_mutation",
+      "copy_sequence",
+      "sequencer_activation",
+      "suppression"
+    ],
+    "state": "DRAFT",
+    "ready": false,
+    "unit_of_work": "person",
+    "stable_identity_fields": [
+      "campaign_key",
+      "linkedin_url"
+    ],
+    "terminal_outcomes": [
+      "activated_verified",
+      "already_satisfied",
+      "review_only",
+      "safely_suppressed",
+      "provider_failure",
+      "destination_rejection",
+      "reconciliation_failure"
+    ],
+    "monotonic_evidence_fields": [
+      "activation_executed",
+      "instantly_write_executed"
+    ]
+  },
   "template": {
     "name": "governed-clay-campaign",
     "version": "1.1.0",
@@ -51,6 +82,9 @@
     "approved_total_clay_credits": 2,
     "approved_byoa_cost_usd": 1
   },
+  "dependencies": {
+    "custom_functions": []
+  },
   "approvals": {
     "config_hash": "",
     "reference": "",
@@ -58,6 +92,8 @@
     "approved_at": null,
     "expires_at": null,
     "paid_work": false,
+    "external_write": false,
+    "publish": false,
     "copy_generation": false,
     "audience_write": false,
     "crm_write": false,

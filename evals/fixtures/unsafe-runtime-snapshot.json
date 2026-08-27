@@ -1,0 +1,89 @@
+{
+  "id": "wfs_fixture_unsafe",
+  "hash": "fixture-unsafe-hash",
+  "nodes": [
+    {
+      "id": "trigger",
+      "name": "Unified Segment",
+      "nodeType": "trigger",
+      "isInitial": false,
+      "isTerminal": false,
+      "nodeConfig": {"nodeType": "trigger"}
+    },
+    {
+      "id": "router",
+      "name": "Route Unified Intake",
+      "nodeType": "conditional",
+      "isInitial": true,
+      "isTerminal": false,
+      "currentScriptVersion": {
+        "code": "def handler(context):\n    context.transition_to('Existing Adapter', 'existing')\n    return context"
+      },
+      "nodeConfig": {
+        "nodeType": "conditional",
+        "conditionalConfig": {"mode": "code", "codeTransitions": []}
+      }
+    },
+    {
+      "id": "adapter",
+      "name": "Existing Adapter",
+      "nodeType": "code",
+      "isInitial": true,
+      "isTerminal": false,
+      "currentScriptVersion": {"code": "def handler(context):\n    return context"},
+      "nodeConfig": {"nodeType": "code"}
+    },
+    {
+      "id": "preflight",
+      "name": "Campaign Preflight",
+      "nodeType": "code",
+      "isInitial": false,
+      "isTerminal": false,
+      "currentScriptVersion": {
+        "code": "def handler(context):\n    config_hash = 'current'\n    approvals = {}\n    approvals['approved_config_hash'] = config_hash\n    return context"
+      },
+      "nodeConfig": {"nodeType": "code"}
+    },
+    {
+      "id": "write",
+      "name": "[EXTERNAL MUTATION] Audience Receipt Write",
+      "nodeType": "tool",
+      "isInitial": false,
+      "isTerminal": false,
+      "nodeConfig": {"nodeType": "tool"}
+    },
+    {
+      "id": "reconcile",
+      "name": "Audience Reconciliation",
+      "nodeType": "code",
+      "isInitial": false,
+      "isTerminal": true,
+      "currentScriptVersion": {
+        "code": "def handler(context):\n    raw = context.get('prior_context_json')\n    member = context.get('salesforce_campaign_member_id')\n    return {'workflow_outcome': 'ACTIVATED_BUT_AUDIENCE_RECEIPT_UNVERIFIED'}"
+      },
+      "nodeConfig": {"nodeType": "code"}
+    },
+    {
+      "id": "plural",
+      "name": "Dual Membership Receipt",
+      "nodeType": "code",
+      "isInitial": false,
+      "isTerminal": true,
+      "currentScriptVersion": {
+        "code": "def handler(context):\n    return {'salesforce_campaign_member_ids': []}"
+      },
+      "nodeConfig": {"nodeType": "code"}
+    }
+  ],
+  "edges": [
+    {"sourceNodeId": "trigger", "targetNodeId": "router", "metadata": null},
+    {
+      "sourceNodeId": "router",
+      "targetNodeId": "adapter",
+      "metadata": {"conditionalSourceHandle": "conditional-code-existing"}
+    },
+    {"sourceNodeId": "adapter", "targetNodeId": "preflight", "metadata": null},
+    {"sourceNodeId": "preflight", "targetNodeId": "write", "metadata": null},
+    {"sourceNodeId": "write", "targetNodeId": "reconcile", "metadata": null}
+  ]
+}

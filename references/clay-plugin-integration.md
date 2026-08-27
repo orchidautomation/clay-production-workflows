@@ -16,7 +16,7 @@ assurance layer. They should cooperate without copying each other's manuals.
 | Discover current actions, schemas, costs, and connected accounts | Clay workflow action-discovery skill |
 | Create or edit nodes, triggers, edges, code, and tool mappings | Clay workflow CLI skill |
 | Compare or restore draft history | Clay workflow snapshots skill |
-| Define campaign contract, approvals, idempotency, and terminal outcomes | This skill |
+| Classify capabilities and define workflow contract, approvals, idempotency, and terminal outcomes | This skill |
 | Audit semantic agreement across producers and consumers | This skill |
 | Design bounded canaries and readiness ceilings | This skill |
 | Reconcile Audience, CRM, or sequencer writes | This skill, using available read surfaces |
@@ -31,8 +31,9 @@ materially, mutate another system, activate outreach, run unattended, or scale.
    routines before proposing net-new search, enrichment, or a Workflow.
 2. Confirm the authenticated workspace once. Resolve the human-readable Workflow
    name and link before discussing identifiers.
-3. For a production Workflow, define or recover the canonical campaign manifest
-   before editing the graph. Read-only inspection does not authorize mutation.
+3. For a production Workflow, classify its capabilities and define or recover the
+   canonical workflow contract before editing the graph. Read-only inspection does
+   not authorize mutation.
 4. Use the plugin's action catalog and schemas instead of guessing action keys,
    result paths, credit costs, account bindings, or writable node shapes.
 5. Use the plugin's workflow CLI guidance for the actual graph operations. Re-read
@@ -49,7 +50,7 @@ materially, mutate another system, activate outreach, run unattended, or scale.
 ## Shared approval rule
 
 The plugin requires explicit approval before credit-consuming actions. This skill
-extends that boundary by binding approval to the normalized campaign configuration,
+extends that boundary by binding approval to the normalized workflow configuration,
 record cohort, worst-case spend, permitted destinations, write types, stop
 conditions, and expiry. Satisfy both layers before acting.
 

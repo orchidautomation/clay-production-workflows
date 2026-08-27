@@ -1,9 +1,10 @@
 # Reconciliation Contract
 
-Each terminal receipt should preserve workflow and campaign IDs, config and AI hashes,
-stable identity, the campaign-plus-identity idempotency key, eligibility and suppression
-decisions, provider/cost path, approvals, intended destination, external response IDs,
-side-effect certainty, readback evidence, terminal outcome, stop reason, and owner.
+Each terminal receipt should preserve workflow and snapshot IDs, workflow/profile key,
+config and AI hashes, stable identity, idempotency key, relevant decision reasons,
+provider/cost path, approvals, intended destination, external response IDs, side-effect
+certainty, readback evidence, terminal outcome, stop reason, and owner. Campaign and
+suppression fields are outbound extensions, not universal requirements.
 Start from `assets/reconciliation-envelope.schema.json`.
 
 | Write | Required readback |
@@ -13,11 +14,12 @@ Start from `assets/reconciliation-envelope.schema.json`.
 | CRM campaign membership | Lookup exact contact plus campaign pair |
 | Sequencer enrollment | Lookup exact email plus campaign and verify required variables |
 
-An API success response is not a readback. Use only: `activated_verified`,
-`already_satisfied`, `review_only`, `safely_suppressed`, `provider_failure`,
-`destination_rejection`, or `reconciliation_failure`.
+An API success response is not a readback. Use only terminal outcomes declared in the
+workflow contract. A successful mutation outcome such as `synced_verified`,
+`routed_verified`, or `activated_verified` requires the intended identifiers, a
+non-empty attempt receipt, and independently verified postconditions.
 
 Run `scripts/validate_reconciliation.py` over one receipt or `{ "data": [...] }`.
-Two distinct activated receipts for the same idempotency key are a blocker. A timeout
-after submission with no resolving readback remains `submitted_unknown`; reconcile
-the destination before retrying.
+Two distinct successful mutation receipts for the same idempotency key are a blocker.
+A timeout after submission with no resolving readback remains `submitted_unknown`;
+reconcile the destination before retrying.

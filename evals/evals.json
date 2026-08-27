@@ -74,6 +74,32 @@
       ]
     },
     {
+      "id": "enrichment-profile-applicability",
+      "prompt": "Audit this paid company-enrichment workflow. It does not send copy or write to a destination.",
+      "files": ["fixtures/enrichment-only-workflow.json", "fixtures/valid-enrichment-manifest.json"],
+      "expected_output": "Apply the universal production kernel and enrichment controls while marking sequence, suppression, trigger-overlap, and destination-reconciliation checks not applicable.",
+      "assertions": [
+        "Applies budget, approval, cache, runtime-outcome, and data-handling controls",
+        "Does not demand a copy sequence or sequencer suppression",
+        "Does not demand Audience trigger evidence",
+        "Marks irrelevant checks NOT_APPLICABLE rather than passed",
+        "Keeps runtime success unproven without a bounded execution trace"
+      ]
+    },
+    {
+      "id": "composed-inbound-crm-profile",
+      "prompt": "Classify and audit this inbound lead-routing workflow that updates a Salesforce owner.",
+      "files": ["fixtures/inbound-routing-workflow.json"],
+      "expected_output": "Compose inbound-routing and CRM-sync controls: deterministic assignment, fallback/SLA coverage, idempotent write approval, and an exact owner readback, without outbound-only requirements.",
+      "assertions": [
+        "Detects both routing and CRM mutation capabilities",
+        "Requires deterministic assignment reason and fallback coverage",
+        "Requires approval, idempotency, payload completeness, and Salesforce readback",
+        "Does not require generated email copy or sequencer suppression",
+        "Does not treat a CRM write response as proof of the owner postcondition"
+      ]
+    },
+    {
       "id": "draft-versus-live-test",
       "prompt": "I edited a published Clay workflow. Test the draft using the Audience segment and confirm the edits work.",
       "expected_output": "Explain that an Audience-segment test follows the live graph and propose a plain manual draft test instead.",
@@ -178,6 +204,54 @@
         "Pairs category color with node shape or text and remains keyboard accessible",
         "States that Mermaid represents supplied intent, not proof of enforcement or execution",
         "Does not mutate, test, publish, activate, or write to any destination"
+      ]
+    },
+    {
+      "id": "raw-snapshot-transition-and-context-regression",
+      "prompt": "Audit this latest Clay snapshot after we replaced several batch triggers with one unified intake router.",
+      "files": ["fixtures/unsafe-runtime-snapshot.json"],
+      "expected_output": "DRAFT_BLOCKED for an unregistered transition, an initial adapter with non-trigger incoming work, and lost pinned context after a tool write.",
+      "assertions": [
+        "Checks called transition IDs against configured transition IDs and edge handles",
+        "Finds an initial node with a non-trigger incoming edge",
+        "Finds prior_context_json missing from explicit input references after a tool",
+        "Reports singular/plural identifier drift without inventing record values",
+        "Does not mutate the workflow"
+      ]
+    },
+    {
+      "id": "overlapping-trigger-generations",
+      "prompt": "We have a new unified Audience trigger and older batch triggers. Can both stay enabled for launch?",
+      "files": ["fixtures/overlapping-trigger-segments.json"],
+      "expected_output": "Block readiness because redacted stable-identity fingerprints overlap and active/paused state is not proven.",
+      "assertions": [
+        "Detects overlap without exposing company identities",
+        "Distinguishes proven active state from unknown state",
+        "Requires one declared active trigger generation",
+        "Does not pause or update a trigger"
+      ]
+    },
+    {
+      "id": "contradictory-run-outcomes",
+      "prompt": "This run verified sequencer activation, but the final node says it stopped before review. What actually happened?",
+      "files": ["fixtures/contradictory-run-trace.json"],
+      "expected_output": "Block scaling because a proven side effect was later downgraded and the run contains incompatible terminal outcomes.",
+      "assertions": [
+        "Finds true-to-false activation and write regressions",
+        "Finds activated followed by stopped-before-review",
+        "Preserves the side effect as real until destination reconciliation disproves it",
+        "Does not recommend a blind retry"
+      ]
+    },
+    {
+      "id": "label-based-control-false-positive",
+      "prompt": "Audit a graph where a conditional router mentions a downstream mutation and a custom function performs the actual CRM write.",
+      "expected_output": "Classify the conditional as routing, the custom function as the write, and require an independent read-only destination action rather than a code receipt label.",
+      "assertions": [
+        "Does not classify a conditional as a write from referenced node text",
+        "Detects a custom mutation function even without a standard action key",
+        "Does not count a response parser named reconciliation as an independent readback",
+        "Requires the custom function fingerprint in the manifest"
       ]
     }
   ]

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 import sys
@@ -15,6 +16,8 @@ from typing import Any
 OUTCOMES = {
     "activated_verified", "already_satisfied", "review_only", "safely_suppressed",
     "provider_failure", "destination_rejection", "reconciliation_failure",
+    "completed_verified", "enriched_verified", "routed_verified", "synced_verified",
+    "review_required", "safely_skipped", "failed",
 }
 
 
@@ -29,8 +32,25 @@ def node_text(node: dict[str, Any]) -> str:
     return json.dumps(node, sort_keys=True).lower()
 
 
+def own_text(node: dict[str, Any]) -> str:
+    """Return text owned by this node, excluding referenced graph metadata."""
+    parts = [
+        str(node.get("name") or ""),
+        str(node.get("description") or ""),
+        str(node.get("code") or ""),
+    ]
+    for tool in node.get("tools") or []:
+        if not isinstance(tool, dict):
+            continue
+        parts.extend(
+            str(tool.get(key) or "")
+            for key in ("actionKey", "name", "description", "toolType")
+        )
+    return " ".join(parts).lower()
+
+
 def destination_for(node: dict[str, Any]) -> str | None:
-    text = node_text(node)
+    text = own_text(node)
     if "audience" in text or "upsert-audiences-record" in text:
         return "audience"
     if any(term in text for term in ("salesforce", "hubspot", "crm", "campaignmember")):
@@ -38,6 +58,12 @@ def destination_for(node: dict[str, Any]) -> str | None:
     if any(term in text for term in ("instantly", "smartlead", "outreach", "sequencer", "enroll")):
         return "sequencer"
     return None
+
+
+def mentions_destination(node: dict[str, Any], destination: str) -> bool:
+    text = re.sub(r"[_-]+", " ", own_text(node))
+    expected = re.sub(r"[_-]+", " ", destination.lower()).strip()
+    return bool(expected and expected in text)
 
 
 def action_keys(node: dict[str, Any]) -> list[str]:
@@ -48,20 +74,119 @@ def action_keys(node: dict[str, Any]) -> list[str]:
     ]
 
 
+def custom_function_ids(node: dict[str, Any]) -> list[str]:
+    ids: list[str] = []
+    for tool in node.get("tools") or []:
+        if not isinstance(tool, dict) or tool.get("toolType") != "clay_function":
+            continue
+        function_id = tool.get("tableId") or tool.get("id")
+        if function_id:
+            ids.append(str(function_id))
+    return sorted(set(ids))
+
+
 def is_write(node: dict[str, Any]) -> bool:
-    text = node_text(node)
-    if "[external mutation]" in text:
+    node_type = str(node.get("nodeType") or "").lower()
+    text = own_text(node)
+    markers = (
+        "[external mutation]",
+        "[external mutation function]",
+        "[bounded mutation]",
+        "[outbound activation]",
+    )
+    if node_type == "tool" and any(marker in text for marker in markers):
         return True
     verbs = ("create", "update", "upsert", "enroll", "add-lead", "send", "write")
-    return any(any(verb in action for verb in verbs) for action in action_keys(node))
+    if node_type == "tool" and any(
+        any(verb in action for verb in verbs) for action in action_keys(node)
+    ):
+        return True
+    explicit_no_write = bool(
+        re.search(
+            r"\bno\s+(?:[a-z]+\s+){0,3}(?:external\s+)?(?:write|mutation|update|create)\b",
+            text,
+        )
+    )
+    return bool(
+        node_type == "tool"
+        and custom_function_ids(node)
+        and not explicit_no_write
+        and any(verb in text for verb in ("create", "update", "upsert", "mutation", "write"))
+    )
 
 
 def is_readback(node: dict[str, Any]) -> bool:
-    name = str(node.get("name") or "").lower()
-    if any(term in name for term in ("reconcil", "readback", "verify", "lookup receipt")):
-        return True
+    if str(node.get("nodeType") or "").lower() != "tool" or is_write(node):
+        return False
     read_verbs = ("get", "list", "lookup", "search", "find")
-    return any(any(verb in action for verb in read_verbs) for action in action_keys(node))
+    keys = action_keys(node)
+    if any(any(verb in action for verb in read_verbs) for action in keys):
+        return True
+    return "[read only]" in own_text(node) and bool(node.get("tools"))
+
+
+def is_approval_control(node: dict[str, Any]) -> bool:
+    name = str(node.get("name") or "").lower()
+    code = str(node.get("code") or "").lower()
+    return bool(
+        any(term in name for term in ("approved?", "approval", "preflight"))
+        or (
+            str(node.get("nodeType") or "").lower() in {"code", "conditional"}
+            and "config_hash" in code
+            and "approv" in code
+        )
+    )
+
+
+def assigned_names(value: ast.AST) -> set[str]:
+    return {item.id for item in ast.walk(value) if isinstance(item, ast.Name)}
+
+
+def subscript_key(target: ast.AST) -> tuple[str | None, str | None]:
+    if not isinstance(target, ast.Subscript) or not isinstance(target.value, ast.Name):
+        return None, None
+    key_node = target.slice
+    if isinstance(key_node, ast.Constant) and isinstance(key_node.value, str):
+        return target.value.id, key_node.value
+    return target.value.id, None
+
+
+def approval_assignment_target(target: ast.AST) -> tuple[str | None, str | None]:
+    if isinstance(target, ast.Name):
+        return None, target.id
+    if isinstance(target, ast.Attribute):
+        owner = target.value.id if isinstance(target.value, ast.Name) else None
+        return owner, target.attr
+    return subscript_key(target)
+
+
+def circular_approval_assignments(node: dict[str, Any]) -> list[dict[str, Any]]:
+    code = str(node.get("code") or "")
+    if not code or "approv" not in code.lower() or "config_hash" not in code.lower():
+        return []
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return []
+    findings: list[dict[str, Any]] = []
+    risky = {
+        "approved_config_hash": {"config_hash", "current_config_hash"},
+        "approval_reference": {"required_approval_reference", "approval_reference"},
+    }
+    for item in ast.walk(tree):
+        if not isinstance(item, (ast.Assign, ast.AnnAssign)):
+            continue
+        targets = item.targets if isinstance(item, ast.Assign) else [item.target]
+        value = item.value
+        if value is None:
+            continue
+        names = assigned_names(value)
+        for target in targets:
+            owner, key = approval_assignment_target(target)
+            owned_by_approval = owner is None or "approv" in owner.lower()
+            if owned_by_approval and key in risky and names & risky[key]:
+                findings.append({"field": key, "line": getattr(item, "lineno", None)})
+    return findings
 
 
 def edge_pair(edge: dict[str, Any]) -> tuple[str | None, str | None]:
@@ -126,7 +251,9 @@ def add(findings: list[dict[str, Any]], severity: str, code: str, **detail: Any)
 
 
 def analyze_graph_controls(
-    graph: dict[str, Any], manifest: dict[str, Any] | None = None
+    graph: dict[str, Any],
+    manifest: dict[str, Any] | None = None,
+    function_fingerprints: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     nodes = [node for node in graph.get("nodes") or [] if isinstance(node, dict)]
     by_id = {str(node.get("id")): node for node in nodes if node.get("id")}
@@ -140,19 +267,28 @@ def analyze_graph_controls(
     findings: list[dict[str, Any]] = []
     writes = [node for node in nodes if is_write(node)]
     readbacks = [node for node in nodes if is_readback(node)]
-    approval_nodes = [
-        node for node in nodes
-        if any(term in node_text(node) for term in ("approval", "approved?", "config_hash"))
-    ]
+    approval_nodes = [node for node in nodes if is_approval_control(node)]
+    for node in nodes:
+        for detail in circular_approval_assignments(node):
+            add(
+                findings,
+                "BLOCKER",
+                "approval_evidence_derived_from_current_configuration",
+                node=node.get("name"),
+                node_id=node.get("id"),
+                **detail,
+            )
     if len(nodes) > 1 and not edges:
         add(findings, "MEDIUM", "graph_edges_unavailable", consequence="branch_and_readback_reachability_unknown")
 
     for write in writes:
         write_id = str(write.get("id"))
         destination = destination_for(write)
+        # A generic lookup cannot prove a destination-specific mutation. Keep
+        # unknown-destination reads paired only with unknown-destination writes.
         candidates = [
             node for node in readbacks
-            if destination_for(node) in {None, destination}
+            if destination_for(node) == destination
         ]
         if edges:
             downstream = reachable(write_id, adjacency)
@@ -197,9 +333,36 @@ def analyze_graph_controls(
     approvals = (manifest or {}).get("approvals") or {}
     destination_ids = (manifest or {}).get("destinations") or {}
     approval_key = {"audience": "audience_write", "crm": "crm_write", "sequencer": "sequencer_write"}
+    unknown_contract_destinations = {
+        str(destination) for destination in payload_contract if destination not in approval_key
+    }
     for destination, required in payload_contract.items():
-        destination_writes = [node for node in writes if destination_for(node) == destination]
-        if approvals.get(approval_key.get(destination, "")) is True and not destination_writes:
+        destination_kind = destination if destination in approval_key else None
+        destination_writes = [node for node in writes if destination_for(node) == destination_kind]
+        if destination_kind is None:
+            named_writes = [
+                node for node in destination_writes if mentions_destination(node, str(destination))
+            ]
+            if named_writes:
+                destination_writes = named_writes
+            elif len(destination_writes) == 1 and len(unknown_contract_destinations) == 1:
+                add(
+                    findings,
+                    "MEDIUM",
+                    "generic_destination_binding_inferred",
+                    destination=destination,
+                    node=destination_writes[0].get("name"),
+                )
+            else:
+                add(
+                    findings,
+                    "HIGH",
+                    "generic_destination_write_binding_ambiguous",
+                    destination=destination,
+                    candidate_nodes=[node.get("name") for node in destination_writes],
+                )
+                destination_writes = []
+        if approvals.get(approval_key.get(destination, "external_write")) is True and not destination_writes:
             add(findings, "BLOCKER", "approved_destination_write_not_detected", destination=destination)
             continue
         for write in destination_writes:
@@ -277,11 +440,70 @@ def analyze_graph_controls(
                         node=write.get("name"),
                     )
 
+    fingerprint_rows = {
+        str(row.get("id")): row
+        for row in (function_fingerprints or {}).get("data") or []
+        if isinstance(row, dict) and row.get("id")
+    }
+    expected_functions = {
+        str(row.get("id")): str(row.get("sha256") or "")
+        for row in (((manifest or {}).get("dependencies") or {}).get("custom_functions") or [])
+        if isinstance(row, dict) and row.get("id")
+    }
+    for node in nodes:
+        for function_id in custom_function_ids(node):
+            observed = fingerprint_rows.get(function_id)
+            if not observed:
+                add(
+                    findings,
+                    "HIGH",
+                    "custom_function_fingerprint_missing",
+                    node=node.get("name"),
+                    function_id=function_id,
+                )
+                continue
+            observed_hash = str(observed.get("sha256") or "")
+            expected_hash = expected_functions.get(function_id)
+            if not expected_hash:
+                add(
+                    findings,
+                    "HIGH",
+                    "custom_function_not_bound_to_manifest",
+                    node=node.get("name"),
+                    function_id=function_id,
+                    observed_sha256=observed_hash,
+                )
+            elif expected_hash != observed_hash:
+                add(
+                    findings,
+                    "BLOCKER",
+                    "custom_function_fingerprint_mismatch",
+                    node=node.get("name"),
+                    function_id=function_id,
+                    expected_sha256=expected_hash,
+                    observed_sha256=observed_hash,
+                )
+            if observed.get("paid_action_keys"):
+                add(
+                    findings,
+                    "MEDIUM",
+                    "custom_function_contains_paid_actions",
+                    node=node.get("name"),
+                    function_id=function_id,
+                    action_keys=observed.get("paid_action_keys"),
+                )
+
     if edges:
+        declared_outcomes = (
+            ((manifest or {}).get("workflow_contract") or {}).get("terminal_outcomes") or []
+        )
+        accepted_outcomes = OUTCOMES | {
+            str(outcome).lower() for outcome in declared_outcomes if isinstance(outcome, str)
+        }
         leaves = [node for node in nodes if node.get("nodeType") != "trigger" and not adjacency.get(str(node.get("id")))]
         for leaf in leaves:
             text = node_text(leaf)
-            if not any(outcome in text for outcome in OUTCOMES):
+            if not any(outcome in text for outcome in accepted_outcomes):
                 add(
                     findings,
                     "HIGH",
@@ -296,6 +518,10 @@ def analyze_graph_controls(
         "valid": blockers == 0 and high == 0,
         "write_nodes": [{"id": node.get("id"), "name": node.get("name"), "destination": destination_for(node)} for node in writes],
         "readback_nodes": [{"id": node.get("id"), "name": node.get("name"), "destination": destination_for(node)} for node in readbacks],
+        "custom_function_nodes": [
+            {"id": node.get("id"), "name": node.get("name"), "function_ids": custom_function_ids(node)}
+            for node in nodes if custom_function_ids(node)
+        ],
         "findings": findings,
         "summary": {"blockers": blockers, "high": high, "warnings": len(findings) - blockers - high},
     }
@@ -305,6 +531,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Audit production controls in a Clay graph.")
     parser.add_argument("graph", type=Path)
     parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--function-fingerprints", type=Path)
     parser.add_argument("--strict", action="store_true")
     return parser.parse_args()
 
@@ -314,10 +541,11 @@ def main() -> int:
     try:
         graph = load_json(args.graph)
         manifest = load_json(args.manifest) if args.manifest else None
+        fingerprints = load_json(args.function_fingerprints) if args.function_fingerprints else None
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
-    result = analyze_graph_controls(graph, manifest)
+    result = analyze_graph_controls(graph, manifest, fingerprints)
     print(json.dumps(result, indent=2, sort_keys=True))
     return 10 if args.strict and not result["valid"] else 0
 

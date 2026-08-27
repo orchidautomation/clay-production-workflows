@@ -1,0 +1,38 @@
+{
+  "summary": {
+    "workflowId": "wf_fixture_enrichment",
+    "workflowName": "Governed company enrichment",
+    "nodeCount": 4,
+    "edges": [
+      {"sourceNodeId": "trigger", "targetNodeId": "preflight"},
+      {"sourceNodeId": "preflight", "targetNodeId": "enrich"},
+      {"sourceNodeId": "enrich", "targetNodeId": "terminal"}
+    ]
+  },
+  "nodes": [
+    {
+      "id": "trigger",
+      "name": "Manual Company Input",
+      "nodeType": "trigger"
+    },
+    {
+      "id": "preflight",
+      "name": "Approval and Credit Preflight",
+      "nodeType": "code",
+      "code": "approval_valid = config_hash == approved_config_hash; within_budget = projected_credits <= approved_total_clay_credits"
+    },
+    {
+      "id": "enrich",
+      "name": "Paid Company Enrichment with Cache",
+      "description": "Spend credits only after cache and budget checks",
+      "nodeType": "tool",
+      "tools": [{"actionKey": "company-enrich-firmographics"}]
+    },
+    {
+      "id": "terminal",
+      "name": "Finalize Verified Enrichment",
+      "nodeType": "code",
+      "code": "terminal_outcome = 'enriched_verified'; enrichment_verified = True"
+    }
+  ]
+}

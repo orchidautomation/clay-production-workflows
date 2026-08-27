@@ -1,0 +1,97 @@
+{
+  "workflow_contract": {
+    "profile": "generic_production",
+    "capabilities": [],
+    "key": "REPLACE_ME",
+    "version": "1.0",
+    "state": "DRAFT",
+    "ready": false,
+    "unit_of_work": "REPLACE_ME",
+    "stable_identity_fields": [],
+    "terminal_outcomes": [
+      "completed_verified",
+      "review_required",
+      "safely_skipped",
+      "failed"
+    ],
+    "monotonic_evidence_fields": []
+  },
+  "template": {
+    "name": "governed-clay-workflow",
+    "version": "1.0.0",
+    "source_workflow_id": "REPLACE_ME",
+    "source_snapshot_id": "REPLACE_ME"
+  },
+  "sources": {
+    "contracts": [],
+    "expected_count": 0,
+    "count_observed_at": null
+  },
+  "eligibility": {
+    "rules": {},
+    "required_fields": []
+  },
+  "payload_contract": {
+    "destination_fields": {},
+    "verification_modes": {}
+  },
+  "destinations": {},
+  "budgets": {
+    "expected_records": 0,
+    "worst_case_credits_per_record": 0,
+    "approved_total_clay_credits": 0,
+    "approved_byoa_cost_usd": 0
+  },
+  "dependencies": {
+    "custom_functions": []
+  },
+  "approvals": {
+    "config_hash": "",
+    "reference": "",
+    "approver": "",
+    "approved_at": null,
+    "expires_at": null,
+    "paid_work": false,
+    "external_write": false,
+    "publish": false
+  },
+  "ownership": {
+    "business_owner": "REPLACE_ME",
+    "builder": "REPLACE_ME",
+    "approver": "REPLACE_ME",
+    "reconciliation_owner": "REPLACE_ME",
+    "incident_owner": "REPLACE_ME"
+  },
+  "operations": {
+    "kill_switch": {
+      "owner": "REPLACE_ME",
+      "trigger_ids": [],
+      "pause_method": "REPLACE_ME",
+      "rollback_snapshot_id": "REPLACE_ME",
+      "downstream_remediation_owner": "REPLACE_ME"
+    }
+  },
+  "data_handling": {
+    "classification": "CONFIDENTIAL",
+    "allowed_log_fields": [
+      "workflow_id",
+      "run_id",
+      "terminal_outcome",
+      "stop_reason"
+    ],
+    "redacted_fields": [
+      "email",
+      "phone",
+      "message_body",
+      "provider_payload",
+      "credentials"
+    ],
+    "evidence_retention_days": 30,
+    "raw_payload_retention_days": 0
+  },
+  "reconciliation": {
+    "owner": "REPLACE_ME",
+    "required_readbacks": [],
+    "success_outcome": "completed_verified"
+  }
+}

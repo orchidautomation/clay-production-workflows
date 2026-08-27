@@ -19,6 +19,14 @@ responsibility must be explicit:
 Do not infer an owner from the workflow creator or connected-account holder. A
 production claim with a missing owner is not launch-ready.
 
+## Trigger cutovers
+
+Treat replacement of batch triggers with a unified trigger as a release migration.
+Hash stable cohort identities, compare the old and new segment generations, and
+prove which trigger IDs are active, paused, or unpublished. Overlapping cohorts are
+release-blocking when both generations are active and remain high risk when trigger
+state is unavailable. Do not leave both generations enabled as a fallback.
+
 ## Kill switch and rollback
 
 Record the live trigger IDs, exact pause or disable method, incident owner, known-good
@@ -58,8 +66,9 @@ they appeared in a run response.
 
 ## Compatibility gate
 
-The evidence collector records an evidence-contract version and the observed Clay
-CLI version. Run `scripts/check_evidence_compat.py` before trusting an audit. A
-changed or missing required JSON shape blocks automated conclusions until the
-collector/parser is updated. Missing version metadata on an otherwise compatible
-older bundle is a warning, not proof of incompatibility.
+The evidence collector records an evidence-contract version, a redaction receipt,
+and the observed Clay CLI version. Run `scripts/check_evidence_compat.py` before
+trusting an audit. A changed or missing required JSON shape blocks automated
+conclusions until the collector/parser is updated. A v1 bundle remains readable,
+but raw-snapshot, trigger-overlap, custom-function, and run-trace coverage must be
+reported as unavailable rather than passed.

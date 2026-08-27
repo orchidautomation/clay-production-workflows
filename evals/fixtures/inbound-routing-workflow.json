@@ -1,0 +1,59 @@
+{
+  "summary": {
+    "workflowId": "wf_fixture_inbound",
+    "workflowName": "Inbound lead territory routing",
+    "nodeCount": 6,
+    "edges": [
+      {"sourceNodeId": "preflight", "targetNodeId": "route"},
+      {"sourceNodeId": "route", "targetNodeId": "payload"},
+      {"sourceNodeId": "payload", "targetNodeId": "write"},
+      {"sourceNodeId": "write", "targetNodeId": "readback"},
+      {"sourceNodeId": "readback", "targetNodeId": "terminal"}
+    ]
+  },
+  "nodes": [
+    {
+      "id": "preflight",
+      "name": "Inbound Approval and Idempotency Preflight",
+      "nodeType": "code",
+      "code": "approval_valid = config_hash == approved_config_hash; idempotency_key = workflow_key + ':' + crm_contact_id"
+    },
+    {
+      "id": "route",
+      "name": "Route Inbound Lead by Territory and Capacity",
+      "nodeType": "conditional",
+      "code": "assigned_owner_id = territory_owner_id; routing_reason = 'territory_capacity'"
+    },
+    {
+      "id": "payload",
+      "name": "Build CRM Ownership Payload",
+      "nodeType": "code",
+      "code": "payload = {'contact_id': crm_contact_id, 'owner_id': assigned_owner_id, 'routing_reason': routing_reason}"
+    },
+    {
+      "id": "write",
+      "name": "[EXTERNAL MUTATION] Update Salesforce Contact Owner",
+      "nodeType": "tool",
+      "tools": [{
+        "actionKey": "salesforce-update-contact",
+        "inputMappingConfig": {
+          "contact_id": {"type": "reference", "expression": "$.payload.contact_id"},
+          "owner_id": {"type": "reference", "expression": "$.payload.owner_id"},
+          "routing_reason": {"type": "reference", "expression": "$.payload.routing_reason"}
+        }
+      }]
+    },
+    {
+      "id": "readback",
+      "name": "[READ ONLY] Verify Salesforce Contact Owner",
+      "nodeType": "tool",
+      "tools": [{"actionKey": "salesforce-get-contact"}]
+    },
+    {
+      "id": "terminal",
+      "name": "Finalize Verified Routing",
+      "nodeType": "code",
+      "code": "terminal_outcome = 'routed_verified'; routing_verified = True"
+    }
+  ]
+}

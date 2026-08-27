@@ -26,9 +26,13 @@ pause method and that the rollback snapshot identifies a known-good draft. Resto
 that snapshot is not a live rollback by itself; the restored graph must be audited,
 approved, and published.
 
-Cover existing CRM contact, net-new contact, missing email, stale employer, existing
-sequencer lead, suppressed/blocklisted lead, missing payload field, provider failure,
-and duplicate rerun when those paths exist.
+Derive branch cases from the effective profiles. Always cover success, missing required
+input, provider/tool failure, validation failure, review/fallback, and duplicate replay
+when those paths exist. Add routing ambiguity and owner-unavailable cases for inbound;
+cache hit, stale value, unsupported and exhausted-fallback cases for enrichment; field
+stewardship, record-exists, association, timeout-after-submit, and partial-write cases
+for CRM; and existing membership, missing email, reply, bounce, unsubscribe, blocklist,
+copy rejection, and sequence-mapping cases for outbound.
 
-`completed` may mean no-send, suppressed, already satisfied, or review-only. It is
-supporting evidence, never an activation-rate calculation.
+`completed` may mean enriched, routed, synced, skipped, suppressed, already satisfied,
+or review-only. It is supporting evidence, never the business success calculation.

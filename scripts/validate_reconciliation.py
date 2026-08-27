@@ -14,9 +14,11 @@ from typing import Any
 OUTCOMES = {
     "activated_verified", "already_satisfied", "review_only", "safely_suppressed",
     "provider_failure", "destination_rejection", "reconciliation_failure",
+    "completed_verified", "enriched_verified", "routed_verified", "synced_verified",
+    "review_required", "safely_skipped", "failed",
 }
 REQUIRED = (
-    "workflow_id", "campaign_key", "config_hash", "stable_identity_hash",
+    "workflow_id", "config_hash", "stable_identity_hash",
     "idempotency_key", "terminal_outcome", "reconciliation_required",
 )
 
@@ -61,9 +63,16 @@ def add(findings: list[dict[str, Any]], severity: str, code: str, **detail: Any)
     findings.append({"severity": severity, "code": code, **detail})
 
 
-def analyze_reconciliation(payload: Any, expected_config_hash: str | None = None) -> dict[str, Any]:
+def analyze_reconciliation(
+    payload: Any,
+    expected_config_hash: str | None = None,
+    allowed_outcomes: set[str] | None = None,
+    success_outcomes: set[str] | None = None,
+) -> dict[str, Any]:
     rows = receipt_rows(payload)
     findings: list[dict[str, Any]] = []
+    accepted_outcomes = OUTCOMES | (allowed_outcomes or set())
+    successful_outcomes = success_outcomes or {"activated_verified"}
     if not rows:
         add(findings, "HIGH", "reconciliation_receipts_missing")
 
@@ -84,7 +93,7 @@ def analyze_reconciliation(payload: Any, expected_config_hash: str | None = None
             )
         outcome = str(receipt.get("terminal_outcome") or "")
         outcome_counts[outcome or "unknown"] += 1
-        if outcome not in OUTCOMES:
+        if outcome not in accepted_outcomes:
             add(findings, "BLOCKER", "terminal_outcome_invalid", index=index, observed=outcome)
 
         key = str(receipt.get("idempotency_key") or "")
@@ -99,15 +108,16 @@ def analyze_reconciliation(payload: Any, expected_config_hash: str | None = None
             if verified_readback(value)
         } if isinstance(readbacks, dict) else set()
 
-        if outcome == "activated_verified":
+        if outcome in successful_outcomes:
+            outcome_prefix = "activated" if outcome == "activated_verified" else "successful_mutation"
             if not intended:
-                add(findings, "BLOCKER", "activated_without_intended_destinations", index=index)
+                add(findings, "BLOCKER", f"{outcome_prefix}_without_intended_destinations", index=index)
             missing_readbacks = sorted(intended - verified)
             if missing_readbacks:
                 add(
                     findings,
                     "BLOCKER",
-                    "activated_without_verified_readbacks",
+                    f"{outcome_prefix}_without_verified_readbacks",
                     index=index,
                     destinations=missing_readbacks,
                 )
@@ -123,7 +133,7 @@ def analyze_reconciliation(payload: Any, expected_config_hash: str | None = None
                 add(
                     findings,
                     "BLOCKER",
-                    "activated_without_external_receipts",
+                    f"{outcome_prefix}_without_external_receipts",
                     index=index,
                     destinations=missing_write_receipts,
                 )
@@ -153,7 +163,11 @@ def analyze_reconciliation(payload: Any, expected_config_hash: str | None = None
                     continue
                 observed_ids = {
                     str(readback_value[key])
-                    for key in ("destination_id", "campaign_id", "audience_id")
+                    for key in (
+                        "destination_id", "record_id", "object_id", "external_id",
+                        "campaign_id", "audience_id", "contact_id", "company_id",
+                        "owner_id", "membership_id",
+                    )
                     if readback_value.get(key)
                 }
                 if intended_value not in observed_ids:
@@ -187,7 +201,7 @@ def analyze_reconciliation(payload: Any, expected_config_hash: str | None = None
             add(findings, "HIGH", "reconciliation_owner_missing", index=index)
 
     for key, duplicates in by_key.items():
-        activated = [row for row in duplicates if row.get("terminal_outcome") == "activated_verified"]
+        activated = [row for row in duplicates if row.get("terminal_outcome") in successful_outcomes]
         receipt_sets = {
             json.dumps(row.get("external_receipts") or {}, sort_keys=True)
             for row in activated
@@ -196,17 +210,21 @@ def analyze_reconciliation(payload: Any, expected_config_hash: str | None = None
             add(
                 findings,
                 "BLOCKER",
-                "duplicate_activation_for_idempotency_key",
+                (
+                    "duplicate_activation_for_idempotency_key"
+                    if successful_outcomes == {"activated_verified"}
+                    else "duplicate_successful_mutation_for_idempotency_key"
+                ),
                 idempotency_key=key,
                 activated_receipts=len(activated),
             )
 
     blockers = sum(item["severity"] == "BLOCKER" for item in findings)
     high = sum(item["severity"] == "HIGH" for item in findings)
-    activated_count = outcome_counts.get("activated_verified", 0)
+    successful_count = sum(outcome_counts.get(outcome, 0) for outcome in successful_outcomes)
     return {
         "valid": blockers == 0 and high == 0,
-        "live_ready_proven": bool(rows) and activated_count > 0 and blockers == 0 and high == 0,
+        "live_ready_proven": bool(rows) and successful_count > 0 and blockers == 0 and high == 0,
         "receipt_count": len(rows),
         "outcome_counts": dict(sorted(outcome_counts.items())),
         "findings": findings,
@@ -227,13 +245,24 @@ def main() -> int:
     try:
         payload = load_json(args.receipts)
         expected_hash = None
+        allowed_outcomes = None
+        success_outcomes = None
         if args.manifest:
             from validate_manifest import configuration_hash
-            expected_hash = configuration_hash(load_json(args.manifest))
+            manifest = load_json(args.manifest)
+            expected_hash = configuration_hash(manifest)
+            contract = manifest.get("workflow_contract") or {}
+            allowed_outcomes = {
+                str(item) for item in contract.get("terminal_outcomes") or [] if item
+            }
+            success = (manifest.get("reconciliation") or {}).get("success_outcome")
+            success_outcomes = {str(success)} if success else None
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
-    result = analyze_reconciliation(payload, expected_hash)
+    result = analyze_reconciliation(
+        payload, expected_hash, allowed_outcomes, success_outcomes
+    )
     print(json.dumps(result, indent=2, sort_keys=True))
     return 10 if args.strict and not result["valid"] else 0
 

@@ -1,0 +1,28 @@
+{
+  "data": [
+    {
+      "runId": "wfr_fixture_contradictory",
+      "nodes": [
+        {
+          "nodeId": "verify",
+          "name": "Instantly Reconciliation",
+          "fields": {
+            "activation_executed": true,
+            "instantly_write_executed": true,
+            "instantly_campaign_membership_verified": true,
+            "workflow_outcome": "ACTIVATED_BUT_AUDIENCE_RECEIPT_UNVERIFIED"
+          }
+        },
+        {
+          "nodeId": "terminal",
+          "name": "Final Review",
+          "fields": {
+            "activation_executed": false,
+            "instantly_write_executed": false,
+            "workflow_outcome": "STOPPED_BEFORE_REVIEW"
+          }
+        }
+      ]
+    }
+  ]
+}

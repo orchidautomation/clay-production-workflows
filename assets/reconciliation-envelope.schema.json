@@ -5,7 +5,6 @@
   "type": "object",
   "required": [
     "workflow_id",
-    "campaign_key",
     "config_hash",
     "stable_identity_hash",
     "idempotency_key",
@@ -20,6 +19,7 @@
     "workflow_id": {"type": "string", "pattern": "^wf_"},
     "workflow_snapshot_id": {"type": ["string", "null"]},
     "run_id": {"type": ["string", "null"]},
+    "workflow_key": {"type": ["string", "null"]},
     "campaign_key": {"type": "string", "minLength": 1},
     "campaign_version": {"type": ["string", "null"]},
     "config_hash": {"type": "string", "minLength": 1},
@@ -36,17 +36,7 @@
       "enum": ["none", "not_submitted", "submitted_unknown", "partially_written", "written", "verified"]
     },
     "credits_spent": {"type": ["number", "null"], "minimum": 0},
-    "terminal_outcome": {
-      "enum": [
-        "activated_verified",
-        "already_satisfied",
-        "review_only",
-        "safely_suppressed",
-        "provider_failure",
-        "destination_rejection",
-        "reconciliation_failure"
-      ]
-    },
+    "terminal_outcome": {"type": "string", "minLength": 1},
     "stop_reason": {"type": ["string", "null"]},
     "reconciliation_required": {"type": "boolean"},
     "reconciliation_owner": {"type": ["string", "null"]}

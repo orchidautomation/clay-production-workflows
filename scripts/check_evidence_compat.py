@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Any
 
 
-CONTRACT_VERSION = 1
+CONTRACT_VERSION = 2
+SUPPORTED_CONTRACT_VERSIONS = {1, 2}
 
 
 def load_json(path: Path) -> Any:
@@ -75,21 +76,71 @@ def analyze_evidence(directory: Path) -> dict[str, Any]:
                 findings.append({"severity": "BLOCKER", "code": "collector_metadata_shape_changed"})
         except ValueError as exc:
             findings.append({"severity": "BLOCKER", "code": "collector_metadata_invalid", "detail": str(exc)})
+    observed_version = metadata.get("evidence_contract_version") if metadata else None
     if not metadata:
         findings.append({"severity": "MEDIUM", "code": "collector_metadata_missing"})
-    elif metadata.get("evidence_contract_version") != CONTRACT_VERSION:
+    elif observed_version not in SUPPORTED_CONTRACT_VERSIONS:
         findings.append({
             "severity": "BLOCKER",
             "code": "evidence_contract_version_unsupported",
-            "expected": CONTRACT_VERSION,
-            "observed": metadata.get("evidence_contract_version"),
+            "supported": sorted(SUPPORTED_CONTRACT_VERSIONS),
+            "observed": observed_version,
         })
+    elif observed_version == 1:
+        findings.append({
+            "severity": "MEDIUM",
+            "code": "legacy_evidence_contract_lacks_runtime_semantics",
+            "missing_capabilities": [
+                "raw_snapshot_semantics",
+                "redacted_trigger_overlap",
+                "custom_function_fingerprints",
+                "run_outcome_traces",
+            ],
+        })
+    elif observed_version == 2:
+        advanced = {
+            "current-snapshot.json": dict,
+            "audience-segments.json": dict,
+            "function-fingerprints.json": dict,
+            "run-traces.json": dict,
+        }
+        for filename, expected_type in advanced.items():
+            path = directory / filename
+            if not path.exists():
+                findings.append({"severity": "BLOCKER", "code": "evidence_file_missing", "file": filename})
+                continue
+            try:
+                value = load_json(path)
+            except ValueError as exc:
+                findings.append({"severity": "BLOCKER", "code": "evidence_json_invalid", "file": filename, "detail": str(exc)})
+                continue
+            if not isinstance(value, expected_type):
+                findings.append({"severity": "BLOCKER", "code": "evidence_top_level_shape_changed", "file": filename})
+            if (
+                filename != "current-snapshot.json"
+                and isinstance(value, dict)
+                and not isinstance(value.get("data"), list)
+            ):
+                findings.append({"severity": "BLOCKER", "code": "collection_shape_changed", "file": filename, "field": "data"})
+            if filename == "current-snapshot.json" and isinstance(value, dict) and (
+                not isinstance(value.get("nodes"), list)
+                or not isinstance(value.get("edges"), list)
+            ):
+                findings.append({
+                    "severity": "BLOCKER",
+                    "code": "current_snapshot_shape_changed",
+                    "file": filename,
+                })
+        redaction = metadata.get("redaction_receipt") or {}
+        if redaction.get("raw_sensitive_values_written") is not False:
+            findings.append({"severity": "HIGH", "code": "evidence_redaction_receipt_missing_or_unsafe"})
 
     blockers = sum(item["severity"] == "BLOCKER" for item in findings)
     high = sum(item["severity"] == "HIGH" for item in findings)
     return {
         "compatible": blockers == 0 and high == 0,
-        "evidence_contract_version": CONTRACT_VERSION,
+        "evidence_contract_version": observed_version,
+        "latest_evidence_contract_version": CONTRACT_VERSION,
         "clay_cli_version": metadata.get("clay_cli_version"),
         "findings": findings,
         "summary": {"blockers": blockers, "high": high, "warnings": len(findings) - blockers - high},

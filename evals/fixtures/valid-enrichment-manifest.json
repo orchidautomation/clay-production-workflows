@@ -1,0 +1,73 @@
+{
+  "workflow_contract": {
+    "profile": "enrichment_sync",
+    "capabilities": ["paid_enrichment"],
+    "key": "company-research",
+    "version": "1.0",
+    "state": "DRAFT",
+    "ready": false,
+    "unit_of_work": "company",
+    "stable_identity_fields": ["domain"],
+    "terminal_outcomes": [
+      "enriched_verified",
+      "review_required",
+      "safely_skipped",
+      "failed"
+    ],
+    "monotonic_evidence_fields": ["enrichment_verified"]
+  },
+  "template": {
+    "name": "governed-company-enrichment",
+    "version": "1.0.0",
+    "source_workflow_id": "wf_fixture_enrichment",
+    "source_snapshot_id": "snap_fixture_enrichment"
+  },
+  "sources": {
+    "contracts": ["manual company input"],
+    "expected_count": 1,
+    "count_observed_at": "2030-01-01T00:00:00Z"
+  },
+  "eligibility": {
+    "rules": {"domain_required": true},
+    "required_fields": ["domain"]
+  },
+  "budgets": {
+    "expected_records": 1,
+    "worst_case_credits_per_record": 2,
+    "approved_total_clay_credits": 2,
+    "approved_byoa_cost_usd": 0
+  },
+  "dependencies": {"custom_functions": []},
+  "approvals": {
+    "config_hash": "",
+    "reference": "",
+    "approver": "",
+    "approved_at": null,
+    "expires_at": null,
+    "paid_work": false,
+    "publish": false
+  },
+  "ownership": {
+    "business_owner": "revenue-operations",
+    "builder": "automation-engineering",
+    "approver": "revenue-operations",
+    "reconciliation_owner": "revenue-operations",
+    "incident_owner": "automation-on-call"
+  },
+  "operations": {
+    "kill_switch": {
+      "owner": "automation-on-call",
+      "trigger_ids": [],
+      "pause_method": "disable the workflow trigger",
+      "rollback_snapshot_id": "snap_fixture_enrichment",
+      "downstream_remediation_owner": "revenue-operations"
+    }
+  },
+  "data_handling": {
+    "classification": "CONFIDENTIAL",
+    "allowed_log_fields": ["workflow_id", "run_id", "terminal_outcome", "enrichment_verified"],
+    "redacted_fields": ["email", "phone", "provider_payload", "credentials"],
+    "evidence_retention_days": 30,
+    "raw_payload_retention_days": 0
+  }
+}
