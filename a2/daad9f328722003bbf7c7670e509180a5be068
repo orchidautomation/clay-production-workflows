@@ -1,0 +1,19 @@
+docs/orchid/receipts/ORCHID-140-execution-shape.json
+  s_67dcc40d5b7105::t_de6def2cca3450 1-129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a2daad9f328722003bbf7c7670e509180a5be068",
+  "prompts": {},
+  "sessions": {
+    "s_67dcc40d5b7105": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a043aa-9bcb-7572-9569-6d124636e4dc",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Brandon Guerrero <brandon@orchidautomation.com>"
+    }
+  }
+}
